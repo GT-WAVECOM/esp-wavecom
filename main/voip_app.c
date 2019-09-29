@@ -235,7 +235,12 @@ static int _sip_event_handler(sip_event_msg_t *event)
     return 0;
 }
 
-struct sockaddr_in servaddr;
+static char* peer_ip;
+static uint16_t peer_port;
+static uint16_t peer_nat;
+
+static struct sockaddr_in servaddr;
+static struct sockaddr stream_addr;
 static int stream_fd;
 
 esp_err_t wavecom_connect()
@@ -259,21 +264,62 @@ esp_err_t wavecom_connect()
     inet_pton(AF_INET, turn_ip, &servaddr.sin_addr); //EX: "123.456.789.123"
     servaddr.sin_port = htons(turn_port);
 
+    stream_addr = *(struct sockaddr *)&servaddr;
+    stream_fd = socket(AF_INET,SOCK_DGRAM,0);
+
+    struct timeval receiving_timeout;
+    receiving_timeout.tv_sec = 2;
+    receiving_timeout.tv_usec = 0;
+    if (setsockopt(stream_fd, SOL_SOCKET, SO_RCVTIMEO, &receiving_timeout,
+        sizeof(receiving_timeout)) < 0) {
+        ESP_LOGE(TAG, "FAILED TO SET SOCKET TIMEOUT");
+    }else {
+        ESP_LOGI(TAG, "SET SOCKET TIMEOUT!");
+    }
+
     sprintf(sndbuf,"%s 1",turn_pool);
 
     ESP_LOGI(TAG, "Sending: %s",sndbuf);
     
-    stream_fd = socket(AF_INET,SOCK_DGRAM,0);
 
     resp_len = sendto(stream_fd, sndbuf, strlen(sndbuf), 0, (struct sockaddr *)&servaddr, sizeof(servaddr));
 
     ESP_LOGI(TAG, "Sent: %d bytes",resp_len);
 
-    resp_len = recvfrom(stream_fd, rcvbuf, sizeof(rcvbuf), 0, NULL, 0);
+    int attempt_count = 0;
+    bool handshake_success = false;
 
-    if (rcvbuf[resp_len-1] != '\0') rcvbuf[resp_len] = '\0';
+    do
+    {
+        resp_len = recvfrom(stream_fd, rcvbuf, sizeof(rcvbuf), 0, NULL, 0);
 
-    ESP_LOGI(TAG,"RECIEVED %s",rcvbuf);
+        if (rcvbuf[resp_len-1] != '\0') rcvbuf[resp_len] = '\0';
+
+        ESP_LOGI(TAG,"RECIEVED %s",rcvbuf);
+
+        if(strlen(rcvbuf) == 8)
+        {
+            handshake_success = true;
+            break;
+        }
+    } while (++attempt_count <= 10);
+    
+    if(handshake_success)
+    {
+        peer_ip = inet_ntoa(*(int *)rcvbuf);
+        peer_port = *(uint16_t *)(rcvbuf + 4);
+
+        ESP_LOGI(TAG, "Partner Information Recieved: %s %d", peer_ip, peer_port);
+
+        ESP_LOGI(TAG, "Connecting to Peer");
+
+        memset(&servaddr, 0, sizeof(servaddr));
+        servaddr.sin_family = AF_INET;
+        inet_pton(AF_INET, peer_ip, &servaddr.sin_addr); //EX: "123.456.789.123"
+        servaddr.sin_port = htons(peer_port);
+
+        stream_addr = *(struct sockaddr *)&servaddr;
+    } 
     
     /*
     // bind to local port 
