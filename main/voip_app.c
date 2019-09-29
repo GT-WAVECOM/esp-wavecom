@@ -242,23 +242,23 @@ static esp_err_t input_key_service_cb(periph_service_handle_t handle, periph_ser
             case INPUT_KEY_USER_ID_REC:
             case INPUT_KEY_USER_ID_PLAY:
                 ESP_LOGI(TAG, "[ * ] [Play] input key event");
-                if (sip_state & SIP_STATE_RINGING) {
-                    esp_sip_uas_answer(sip, true);
-                }
-                if (sip_state & SIP_STATE_REGISTERED) {
-                    esp_sip_uac_invite(sip, "101");
-                }
+                // if (sip_state & SIP_STATE_RINGING) {
+                //     esp_sip_uas_answer(sip, true);
+                // }
+                // if (sip_state & SIP_STATE_REGISTERED) {
+                //     esp_sip_uac_invite(sip, "101");
+                // }
                 break;
             case INPUT_KEY_USER_ID_MODE:
             case INPUT_KEY_USER_ID_SET:
                 ESP_LOGI(TAG, "[ * ] [Set] input key event");
-                if (sip_state & SIP_STATE_RINGING) {
-                    esp_sip_uas_answer(sip, false);
-                } else if (sip_state & SIP_STATE_ON_CALL) {
-                    esp_sip_uac_bye(sip);
-                } else if ((sip_state & SIP_STATE_CALLING) || (sip_state & SIP_STATE_SESS_PROGRESS)) {
-                    esp_sip_uac_cancel(sip);
-                }
+                // if (sip_state & SIP_STATE_RINGING) {
+                //     esp_sip_uas_answer(sip, false);
+                // } else if (sip_state & SIP_STATE_ON_CALL) {
+                //     esp_sip_uac_bye(sip);
+                // } else if ((sip_state & SIP_STATE_CALLING) || (sip_state & SIP_STATE_SESS_PROGRESS)) {
+                //     esp_sip_uac_cancel(sip);
+                // }
                 break;
             case INPUT_KEY_USER_ID_VOLUP:
                 ESP_LOGI(TAG, "[ * ] [Vol+] input key event");
@@ -282,6 +282,21 @@ static esp_err_t input_key_service_cb(periph_service_handle_t handle, periph_ser
     }
 
     return ESP_OK;
+}
+
+void wavecom_connect()
+{
+
+}
+
+void wavecom_send()
+{
+
+}
+
+void wavecom_recieve()
+{
+    
 }
 
 void app_main()
@@ -327,17 +342,17 @@ void app_main()
     periph_service_set_callback(input_ser, input_key_service_cb, (void *)board_handle);
 
     ESP_LOGI(TAG, "[ 4 ] Create SIP Service");
-    sip_config_t sip_cfg = {
-        .uri = CONFIG_SIP_URI,
-        .event_handler = _sip_event_handler,
-#ifdef CONFIG_SIP_CODEC_G711A
-        .acodec_type = SIP_ACODEC_G711A,
-#else
-        .acodec_type = SIP_ACODEC_G711U,
-#endif
-    };
-    sip = esp_sip_init(&sip_cfg);
-    esp_sip_start(sip);
+//     sip_config_t sip_cfg = {
+//         .uri = CONFIG_SIP_URI,
+//         .event_handler = _sip_event_handler,
+// #ifdef CONFIG_SIP_CODEC_G711A
+//         .acodec_type = SIP_ACODEC_G711A,
+// #else
+//         .acodec_type = SIP_ACODEC_G711U,
+// #endif
+//     };
+//     sip = esp_sip_init(&sip_cfg);
+//     esp_sip_start(sip);
 
     ESP_LOGI(TAG, "[ 5 ] Create decoder and encoder pipelines");
     g711enc_pipeline_open();
