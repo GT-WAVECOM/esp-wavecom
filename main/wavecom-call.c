@@ -1,0 +1,119 @@
+#include "wavecom-call.h"
+
+#include <string.h>
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/event_groups.h"
+
+#include "tcpip_adapter.h"
+#include "lwip/api.h"
+#include "lwip/inet.h"
+#include "lwip/ip4_addr.h"
+#include "lwip/dns.h"
+#include "lwip/sockets.h"
+#include "lwip/netdb.h"
+
+#include "esp_system.h"
+#include "esp_log.h"
+
+static const char *TAG = "CALL";
+
+static char* peer_ip;
+static uint16_t peer_port;
+static uint16_t peer_nat;
+
+static struct sockaddr_in servaddr;
+static struct sockaddr stream_addr;
+static int stream_fd;
+
+void wavecom_connect(void)
+{
+    char *rcvbuf = malloc(1024);
+    char *sndbuf = malloc(1024);
+
+
+    char *turn_pool = "abcdefgh";
+    char *turn_ip = "54.83.79.129";
+    short turn_port = 7000;//6000 to 16000 incremented by 1k
+
+
+    ESP_LOGI(TAG, "Connection Request Initaited");
+    ESP_LOGI(TAG, "IP: %s PORT: %d POOL: %s",turn_ip,turn_port,turn_pool);
+
+    //setting up socket for TURN connection
+    int resp_len;
+    memset(&servaddr,0,sizeof(servaddr));
+    servaddr.sin_family = AF_INET;
+    inet_pton(AF_INET, turn_ip, &servaddr.sin_addr); //EX: "123.456.789.123"
+    servaddr.sin_port = htons(turn_port);
+
+    stream_addr = *(struct sockaddr *)&servaddr;
+    stream_fd = socket(AF_INET,SOCK_DGRAM,0);
+
+    struct timeval receiving_timeout;
+    receiving_timeout.tv_sec = 2;
+    receiving_timeout.tv_usec = 0;
+    if (setsockopt(stream_fd, SOL_SOCKET, SO_RCVTIMEO, &receiving_timeout,
+        sizeof(receiving_timeout)) < 0) {
+        ESP_LOGE(TAG, "FAILED TO SET SOCKET TIMEOUT");
+    }else {
+        ESP_LOGI(TAG, "SET SOCKET TIMEOUT!");
+    }
+
+    sprintf(sndbuf,"%s 1",turn_pool);
+
+    ESP_LOGI(TAG, "Sending: %s",sndbuf);
+    
+
+    resp_len = sendto(stream_fd, sndbuf, strlen(sndbuf), 0, (struct sockaddr *)&servaddr, sizeof(servaddr));
+
+    ESP_LOGI(TAG, "Sent: %d bytes",resp_len);
+
+    int attempt_count = 0;
+    bool handshake_success = false;
+
+    do
+    {
+        resp_len = recvfrom(stream_fd, rcvbuf, sizeof(rcvbuf), 0, NULL, 0);
+
+        if (rcvbuf[resp_len-1] != '\0') rcvbuf[resp_len] = '\0';
+
+        ESP_LOGI(TAG,"RECIEVED %s",rcvbuf);
+
+        if(strlen(rcvbuf) == 8)
+        {
+            handshake_success = true;
+            break;
+        }
+    } while (++attempt_count <= 10);
+    
+    if(handshake_success)
+    {
+        peer_ip = inet_ntoa(*(int *)rcvbuf);
+        peer_port = *(uint16_t *)(rcvbuf + 4);
+
+        ESP_LOGI(TAG, "Partner Information Recieved: %s %d", peer_ip, peer_port);
+
+        ESP_LOGI(TAG, "Connecting to Peer");
+
+        memset(&servaddr, 0, sizeof(servaddr));
+        servaddr.sin_family = AF_INET;
+        inet_pton(AF_INET, peer_ip, &servaddr.sin_addr); //EX: "123.456.789.123"
+        servaddr.sin_port = htons(peer_port);
+
+        stream_addr = *(struct sockaddr *)&servaddr;
+    } 
+
+    vTaskDelete(NULL);
+}
+
+void wavecom_send()
+{
+
+}
+
+void wavecom_recieve()
+{
+
+}

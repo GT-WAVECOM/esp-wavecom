@@ -32,13 +32,7 @@
 #include "esp_sip.h"
 #include "g711.h"
 
-#include "tcpip_adapter.h"
-#include "lwip/api.h"
-#include "lwip/inet.h"
-#include "lwip/ip4_addr.h"
-#include "lwip/dns.h"
-#include "lwip/sockets.h"
-#include "lwip/netdb.h"
+#include "wavecom-call.h"
 
 static const char *TAG = "VOIP_EXAMPLE";
 
@@ -235,223 +229,6 @@ static int _sip_event_handler(sip_event_msg_t *event)
     return 0;
 }
 
-static char* peer_ip;
-static uint16_t peer_port;
-static uint16_t peer_nat;
-
-static struct sockaddr_in servaddr;
-static struct sockaddr stream_addr;
-static int stream_fd;
-
-esp_err_t wavecom_connect()
-{
-    char *rcvbuf = malloc(1024);
-    char *sndbuf = malloc(1024);
-
-
-    char *turn_pool = "abcdefgh";
-    char *turn_ip = "54.83.79.129";
-    short turn_port = 7000;//6000 to 16000 incremented by 1k
-
-
-    ESP_LOGI(TAG, "Connection Request Initaited");
-    ESP_LOGI(TAG, "IP: %s PORT: %d POOL: %s",turn_ip,turn_port,turn_pool);
-
-    //setting up socket for TURN connection
-    int resp_len;
-    memset(&servaddr,0,sizeof(servaddr));
-    servaddr.sin_family = AF_INET;
-    inet_pton(AF_INET, turn_ip, &servaddr.sin_addr); //EX: "123.456.789.123"
-    servaddr.sin_port = htons(turn_port);
-
-    stream_addr = *(struct sockaddr *)&servaddr;
-    stream_fd = socket(AF_INET,SOCK_DGRAM,0);
-
-    struct timeval receiving_timeout;
-    receiving_timeout.tv_sec = 2;
-    receiving_timeout.tv_usec = 0;
-    if (setsockopt(stream_fd, SOL_SOCKET, SO_RCVTIMEO, &receiving_timeout,
-        sizeof(receiving_timeout)) < 0) {
-        ESP_LOGE(TAG, "FAILED TO SET SOCKET TIMEOUT");
-    }else {
-        ESP_LOGI(TAG, "SET SOCKET TIMEOUT!");
-    }
-
-    sprintf(sndbuf,"%s 1",turn_pool);
-
-    ESP_LOGI(TAG, "Sending: %s",sndbuf);
-    
-
-    resp_len = sendto(stream_fd, sndbuf, strlen(sndbuf), 0, (struct sockaddr *)&servaddr, sizeof(servaddr));
-
-    ESP_LOGI(TAG, "Sent: %d bytes",resp_len);
-
-    int attempt_count = 0;
-    bool handshake_success = false;
-
-    do
-    {
-        resp_len = recvfrom(stream_fd, rcvbuf, sizeof(rcvbuf), 0, NULL, 0);
-
-        if (rcvbuf[resp_len-1] != '\0') rcvbuf[resp_len] = '\0';
-
-        ESP_LOGI(TAG,"RECIEVED %s",rcvbuf);
-
-        if(strlen(rcvbuf) == 8)
-        {
-            handshake_success = true;
-            break;
-        }
-    } while (++attempt_count <= 10);
-    
-    if(handshake_success)
-    {
-        peer_ip = inet_ntoa(*(int *)rcvbuf);
-        peer_port = *(uint16_t *)(rcvbuf + 4);
-
-        ESP_LOGI(TAG, "Partner Information Recieved: %s %d", peer_ip, peer_port);
-
-        ESP_LOGI(TAG, "Connecting to Peer");
-
-        memset(&servaddr, 0, sizeof(servaddr));
-        servaddr.sin_family = AF_INET;
-        inet_pton(AF_INET, peer_ip, &servaddr.sin_addr); //EX: "123.456.789.123"
-        servaddr.sin_port = htons(peer_port);
-
-        stream_addr = *(struct sockaddr *)&servaddr;
-    } 
-    
-    /*
-    // bind to local port 
-    localaddr.sin_family = AF_INET;
-    localaddr.sin_port = htons(CLIENT_PORT);
-    localaddr.sin_addr.s_addr = INADDR_ANY;
-    if( !bind(stream_fd, (struct sockaddr*) &localaddr, sizeof(struct sockaddr_in))){
-        ESP_LOGI(TAG, "Binded correctly to local port");
-    }
-    else{
-        ESP_LOGE(TAG, "Binding to local port failed");
-    }
-    
-    //Set Socket Timeout
-    struct timeval receiving_timeout;
-    receiving_timeout.tv_sec = 2;
-    receiving_timeout.tv_usec = 0;
-    if (setsockopt(stream_fd, SOL_SOCKET, SO_RCVTIMEO, &receiving_timeout,
-        sizeof(receiving_timeout)) < 0) {
-        ESP_LOGE(TAG, "FAILED TO SET SOCKET TIMEOUT");
-    }else {
-        ESP_LOGI(TAG, "SET SOCKET TIMEOUT!");
-    }
-
-    stream_addr = *(struct sockaddr *)&servaddr;
-
-    //counting attempts to complete handshakes
-    uint8_t handshake_retry_count = 0;
-    uint8_t handshake_max_retries = 3;
-
-    //counting attempts to recieve handshake response
-    uint8_t socket_retry_count = 0;
-    uint8_t socket_max_retry = 2;
-
-    bool handshake_success = false;
-
-    while (true)
-    {
-        //initiate handshake
-        resp_len = sendto(stream_fd, sndbuf, strlen(sndbuf), 0, (struct sockaddr *)&servaddr, sizeof(servaddr));
-
-        if (resp_len != strlen(sndbuf))
-        { 
-            //socket send failed
-            ESP_LOGE(TAG, "Failed To Send OK POOL errno:%d len:%d", errno, resp_len);
-
-            if (++handshake_retry_count == handshake_max_retries)
-                return ESP_FAIL;
-            continue;
-        }
-
-        //clear rcv buffer
-        memset(rcvbuf, 0, sizeof(rcvbuf));
-
-        socket_retry_count = 0;
-
-        do
-        {
-            //wait for hadnshake response
-            resp_len = recvfrom(stream_fd, rcvbuf, sizeof(rcvbuf), 0, NULL, 0);
-
-            if (resp_len == 8)
-            {
-                if(!strcmp(rcvbuf, hungup_immediately)){
-                    ESP_LOGI(TAG, "User hungup immediately\n");
-                    xSemaphoreGive(xLCStopSemaphore);
-                    vTaskDelay(10); // wait for SEND and LC to STOP, RECV will stop only on socket close as it will get stuck on a blocking recv
-                    close(stream_fd);
-                    device_state = SENSING;
-                    all_rgb(device_config->light_status.r,device_config->light_status.g,device_config->light_status.b);  
-                    return ESP_FAIL;   
-                }
-                else{
-                    play_ringtone(MEMO_END_VMID); //start playing ringtone
-                    //otherwise handshake is successful
-                    handshake_success = true;
-                    break;
-                }
-            }
-            else if (errno == 11 && socket_retry_count < socket_max_retry)
-            {
-                //if socket times out
-                ESP_LOGI(TAG, "Socket Timeout, Retrying");
-                socket_retry_count++;
-            }
-            else if (resp_len != 8 || errno != 11 || socket_retry_count == socket_max_retry)
-            { 
-                //if response incorrect or number of retries is exceeded
-                ESP_LOGE(TAG, "Partner Request Failed errno:%d len:%d val:%s", errno, resp_len, rcvbuf);
-                break;
-            }
-            
-            
-        } while (errno == 11); //while response is in timeout 
-
-        if(handshake_success) break; //exit loop on success
-
-        // if another attempt is needed
-        if (++handshake_retry_count == handshake_max_retries)
-            return ESP_FAIL;
-    }
-
-    peer_ip = inet_ntoa(*(int *)rcvbuf);
-    peer_port = *(uint16_t *)(rcvbuf + 4);
-    peer_nat = *(uint16_t *)(rcvbuf + 6);
-
-    ESP_LOGI(TAG, "Partner Information Recieved: %s %d %d", peer_ip, peer_port, peer_nat);
-
-    ESP_LOGI(TAG, "Connecting to Peer");
-
-    memset(&servaddr, 0, sizeof(servaddr));
-    servaddr.sin_family = AF_INET;
-    inet_pton(AF_INET, peer_ip, &servaddr.sin_addr); //EX: "123.456.789.123"
-    servaddr.sin_port = htons(peer_port);
-
-    stream_addr = *(struct sockaddr *)&servaddr;
-    */
-
-    return ESP_OK;
-}
-
-void wavecom_send()
-{
-
-}
-
-void wavecom_recieve()
-{
-
-}
-
-
 static esp_err_t input_key_service_cb(periph_service_handle_t handle, periph_service_event_t *evt, void *ctx)
 {
     audio_board_handle_t board_handle = (audio_board_handle_t) ctx;
@@ -463,13 +240,12 @@ static esp_err_t input_key_service_cb(periph_service_handle_t handle, periph_ser
             case INPUT_KEY_USER_ID_REC:
             case INPUT_KEY_USER_ID_PLAY:
                 ESP_LOGI(TAG, "[ * ] [Play] input key event");
-                esp_err_t err = wavecom_connect();
 
-                if (err == ESP_OK)
+                BaseType_t res = xTaskCreate(&wavecom_connect,"voice memo play task",4096,NULL,10,NULL);
+
+                if (res != pdPASS)
                 {
-                    ESP_LOGI(TAG,"CONNECTION SUCCESS");
-                } else {
-                    ESP_LOGE(TAG,"CONNECTION FAILED");
+                    ESP_LOGE(TAG,"error %d when creating task wavecom_connect",(int)res);
                 }
 
                 break;
