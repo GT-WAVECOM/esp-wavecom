@@ -36,16 +36,6 @@
 
 static const char *TAG = "VOIP_EXAMPLE";
 
-#define RTP_HEADER_LEN 0
-#define AUDIO_FRAME_SIZE (160)
-
-#define I2S_SAMPLE_RATE     48000
-#define I2S_CHANNEL         2
-#define I2S_BITS            16
-
-#define G711_SAMPLE_RATE    16000
-#define G711_CHANNEL        1
-
 static sip_handle_t sip;
 static audio_element_handle_t raw_read;
 static audio_element_handle_t raw_write;
@@ -93,7 +83,7 @@ static esp_err_t g711enc_pipeline_open()
     return ESP_OK;
 }
 
-static int _g711_encode(char *data, int len)
+int _g711_encode(char *data, int len)
 {
     int out_len_bytes;
 
@@ -157,7 +147,7 @@ static esp_err_t g711dec_pipeline_open()
     return ESP_OK;
 }
 
-static int _g711_decode(char *data, int len)
+int _g711_decode(char *data, int len)
 {
     int16_t *dec_buffer = (int16_t *)audio_malloc(2 * (len - RTP_HEADER_LEN));
 
