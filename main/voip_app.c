@@ -231,7 +231,7 @@ static esp_err_t input_key_service_cb(periph_service_handle_t handle, periph_ser
             case INPUT_KEY_USER_ID_PLAY:
                 ESP_LOGI(TAG, "[ * ] [Play] input key event");
 
-                BaseType_t res = xTaskCreate(&wavecom_connect,"voice memo play task",4096,NULL,10,NULL);
+                BaseType_t res = xTaskCreate(&wavecom_connect,"call connection task",4096,NULL,10,NULL);
 
                 if (res != pdPASS)
                 {

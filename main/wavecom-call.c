@@ -24,7 +24,7 @@
 static const char *TAG = "CALL";
 
 static char *peer_ip;
-static uint16_t peer_port;
+static short peer_port;
 static uint16_t peer_nat;
 
 static struct sockaddr_in servaddr;
@@ -105,13 +105,13 @@ void wavecom_connect(void)
                 break;
             }
         }
-        vTaskDelay(100);
-    } while (++attempt_count <= 10);
+        vTaskDelay(300);
+    } while (++attempt_count <= 30);
 
     if (handshake_success)
     {
         peer_ip = inet_ntoa(*(int *)rcvbuf);
-        peer_port = *(uint16_t *)(rcvbuf + 4);
+        peer_port = *(short *)(rcvbuf + 4);
 
         ESP_LOGI(TAG, "Partner Information Recieved: %s %d", peer_ip, peer_port);
 
@@ -123,6 +123,20 @@ void wavecom_connect(void)
         servaddr.sin_port = htons(peer_port);
 
         stream_addr = *(struct sockaddr *)&servaddr;
+        
+        BaseType_t res = xTaskCreate(&wavecom_send,"call send task",4096,NULL,10,NULL);
+
+        if (res != pdPASS)
+        {
+            ESP_LOGE(TAG,"error %d when creating task wavecom_send",(int)res);
+        }
+
+        res = xTaskCreate(&wavecom_recieve,"call recieve task",4096,NULL,10,NULL);
+
+        if (res != pdPASS)
+        {
+            ESP_LOGE(TAG,"error %d when creating task wavecom_recieve",(int)res);
+        }
     }
 
     vTaskDelete(NULL);
@@ -131,7 +145,6 @@ void wavecom_connect(void)
 void wavecom_send()
 {
     int res = 0;
-
     double curr_time;
 
     if (i2s_out_buff == NULL)
@@ -158,11 +171,11 @@ void wavecom_send()
             memset(i2s_out_buff, 0, AUDIO_FRAME_SIZE);
         }
 
-        res = sendto(stream_fd, i2s_out_buff, AUDIO_FRAME_SIZE, 0, &stream_addr, sizeof(stream_addr));
+        res = sendto(stream_fd, i2s_out_buff, AUDIO_FRAME_SIZE*2, 0, &stream_addr, sizeof(stream_addr));
 
-        if (res != AUDIO_FRAME_SIZE)
+        if (res != AUDIO_FRAME_SIZE*2)
         {
-            ESP_LOGE(TAG, "Voice call sent %d bytes instead of %d", res, AUDIO_FRAME_SIZE);
+            ESP_LOGE(TAG, "Voice call sent %d bytes instead of %d", res, AUDIO_FRAME_SIZE*2);
         }
     }
     vTaskDelete(NULL);
@@ -189,17 +202,12 @@ void wavecom_recieve()
     {
         res = recvfrom(stream_fd, i2s_in_buff, 2048, 0, NULL, 0);
 
-        if (res == 8)
-        {
-            ESP_LOGI(TAG, "RECV STOPPING, RECIEVED: %s", (char *)i2s_in_buff);
-            break;
-        }
-        else if (res < 0)
+        if (res < 0)
         {
             ESP_LOGE(TAG, "Voice Call Socket Error errno:%d len:%d", errno, res);
             continue;
         }
-        else if (res > 1)
+        else if (res > 8)
         {
             timer_set_counter_value(TIMER_GROUP_0, TIMER_0, 0);
             _g711_decode(i2s_in_buff, res);
