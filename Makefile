@@ -3,7 +3,6 @@
 # project subdirectory.
 #
 
-PROJECT_NAME := voip_app
+PROJECT_NAME := $(notdir $(shell pwd))
 
-include $(ADF_PATH)/project.mk
-
+include $(MDF_PATH)/project.mk
