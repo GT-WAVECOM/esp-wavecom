@@ -82,7 +82,7 @@ void wavecom_connect(void)
 
         ESP_LOGI(TAG, "Sent: %d bytes", resp_len);
 
-        resp_len = recvfrom(stream_fd, rcvbuf, sizeof(rcvbuf), 0, NULL, 0);
+        resp_len = recvfrom(stream_fd, rcvbuf, 1024, 0, NULL, 0);
 
         if (resp_len < 0)
         {
@@ -94,13 +94,9 @@ void wavecom_connect(void)
         }
         else
         {
-            if (rcvbuf[resp_len - 1] != '\0')
-                rcvbuf[resp_len] = '\0';
-
-            ESP_LOGI(TAG, "RECIEVED %s", rcvbuf);
-
-            if (strlen(rcvbuf) >= 2)
+            if (resp_len >= 2)
             {
+                ESP_LOGI(TAG,"RECIEVED %d bytes",resp_len);
                 handshake_success = true;
                 break;
             }
@@ -149,7 +145,7 @@ void wavecom_send()
 
     if (i2s_out_buff == NULL)
     {
-        i2s_out_buff = (int16_t *)malloc(AUDIO_FRAME_SIZE);
+        i2s_out_buff = (int16_t *)calloc(sizeof(int16_t),AUDIO_FRAME_SIZE);
     }
 
     while (true)
@@ -168,7 +164,13 @@ void wavecom_send()
         }
         else
         {
-            memset(i2s_out_buff, 0, AUDIO_FRAME_SIZE);
+            memset(i2s_out_buff, 0, AUDIO_FRAME_SIZE*2);
+        }
+
+        if(res == 0)
+        {
+            ESP_LOGI(TAG,"_g711_encode returned 0");
+            continue;
         }
 
         res = sendto(stream_fd, i2s_out_buff, AUDIO_FRAME_SIZE*2, 0, &stream_addr, sizeof(stream_addr));
