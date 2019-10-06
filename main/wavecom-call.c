@@ -31,8 +31,8 @@ static struct sockaddr_in servaddr;
 static struct sockaddr stream_addr;
 static int stream_fd;
 
-static int16_t *i2s_out_buff = NULL;
-static int16_t *i2s_in_buff = NULL;
+static char *i2s_out_buff = NULL;
+static char *i2s_in_buff = NULL;
 
 void wavecom_connect(void)
 {
@@ -142,10 +142,11 @@ void wavecom_send()
 {
     int res = 0;
     double curr_time;
+    bool speaker_muted = false;
 
     if (i2s_out_buff == NULL)
     {
-        i2s_out_buff = (int16_t *)calloc(sizeof(int16_t),AUDIO_FRAME_SIZE);
+        i2s_out_buff = calloc(sizeof(int8_t),AUDIO_FRAME_SIZE);
     }
 
     while (true)
@@ -156,15 +157,20 @@ void wavecom_send()
 
         if (curr_time > 0.1)
         {
-            if (i2s_in_buff)
+            if (i2s_in_buff && !speaker_muted)
             {
-                memset(i2s_in_buff, 0, 2048);
-                _g711_decode(i2s_in_buff, 2048);
+                //ESP_LOGI(TAG,"speaker muted");
+                memset(i2s_in_buff, 0, 1024);
+                _g711_decode(i2s_in_buff, 1024);
+                speaker_muted = true;
+
             }
         }
         else
         {
-            memset(i2s_out_buff, 0, AUDIO_FRAME_SIZE*2);
+            speaker_muted = false;
+            //ESP_LOGI(TAG,"microphone muted");
+            memset(i2s_out_buff, 0, AUDIO_FRAME_SIZE);
         }
 
         if(res == 0)
@@ -173,11 +179,11 @@ void wavecom_send()
             continue;
         }
 
-        res = sendto(stream_fd, i2s_out_buff, AUDIO_FRAME_SIZE*2, 0, &stream_addr, sizeof(stream_addr));
+        res = sendto(stream_fd, i2s_out_buff, AUDIO_FRAME_SIZE, 0, &stream_addr, sizeof(stream_addr));
 
-        if (res != AUDIO_FRAME_SIZE*2)
+        if (res != AUDIO_FRAME_SIZE)
         {
-            ESP_LOGE(TAG, "Voice call sent %d bytes instead of %d", res, AUDIO_FRAME_SIZE*2);
+            ESP_LOGE(TAG, "Voice call sent %d bytes instead of %d", res, AUDIO_FRAME_SIZE);
         }
     }
     vTaskDelete(NULL);
@@ -185,11 +191,12 @@ void wavecom_send()
 
 void wavecom_recieve()
 {
-    int res;
+    int res = 0;
 
     if (i2s_in_buff == NULL)
     {
-        i2s_in_buff = calloc(1024, sizeof(int16_t));
+        i2s_in_buff = calloc(1024, sizeof(int8_t));
+        _g711_decode(i2s_in_buff, res);
     }
 
     timer_config_t config;
@@ -202,7 +209,7 @@ void wavecom_recieve()
 
     while (true)
     {
-        res = recvfrom(stream_fd, i2s_in_buff, 2048, 0, NULL, 0);
+        res = recvfrom(stream_fd, i2s_in_buff, 1024, 0, NULL, 0);
 
         if (res < 0)
         {
