@@ -40,7 +40,7 @@ void wavecom_connect(void)
     char *sndbuf = malloc(1024);
 
     char *turn_pool = "abcdefgh";
-    char *turn_ip = "10.150.20.255";
+    char *turn_ip = "54.83.79.129";
     short turn_port = 7000; //6000 to 16000 incremented by 1k
 
     ESP_LOGI(TAG, "Connection Request Initaited");
