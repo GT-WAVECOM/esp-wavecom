@@ -10,6 +10,11 @@
 #define G711_SAMPLE_RATE    16000
 #define G711_CHANNEL        1
 
+struct sockaddr_in servaddr;
+struct sockaddr stream_addr;
+int stream_fd;
+
+
 int _g711_encode(char *data, int len);
 int _g711_decode(char *data, int len);
 

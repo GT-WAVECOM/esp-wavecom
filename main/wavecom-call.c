@@ -21,15 +21,14 @@
 #include "driver/periph_ctrl.h"
 #include "driver/timer.h"
 
+#include "mdf_common.h"
+#include "mwifi.h"
+
 static const char *TAG = "CALL";
 
 static char *peer_ip;
 static short peer_port;
 static uint16_t peer_nat;
-
-static struct sockaddr_in servaddr;
-static struct sockaddr stream_addr;
-static int stream_fd;
 
 static char *i2s_out_buff = NULL;
 static char *i2s_in_buff = NULL;
@@ -127,12 +126,12 @@ void wavecom_connect(void)
             ESP_LOGE(TAG,"error %d when creating task wavecom_send",(int)res);
         }
 
-        res = xTaskCreate(&wavecom_recieve,"call recieve task",4096,NULL,10,NULL);
+        // res = xTaskCreate(&wavecom_recieve,"call recieve task",4096,NULL,10,NULL);
 
-        if (res != pdPASS)
-        {
-            ESP_LOGE(TAG,"error %d when creating task wavecom_recieve",(int)res);
-        }
+        // if (res != pdPASS)
+        // {
+        //     ESP_LOGE(TAG,"error %d when creating task wavecom_recieve",(int)res);
+        // }
     }
 
     vTaskDelete(NULL);
@@ -144,6 +143,8 @@ void wavecom_send()
     double curr_time;
     bool speaker_muted = false;
 
+    mwifi_data_type_t data_type     = {0};
+
     if (i2s_out_buff == NULL)
     {
         i2s_out_buff = calloc(sizeof(int8_t),AUDIO_FRAME_SIZE);
@@ -151,6 +152,10 @@ void wavecom_send()
 
     while (true)
     {
+        if (!mwifi_is_connected()) {
+            vTaskDelay(500 / portTICK_RATE_MS);
+            continue;
+        }
         timer_get_counter_time_sec(TIMER_GROUP_0, TIMER_0, &curr_time);
 
         res = _g711_encode(i2s_out_buff, AUDIO_FRAME_SIZE);
@@ -179,19 +184,23 @@ void wavecom_send()
             continue;
         }
 
-        res = sendto(stream_fd, i2s_out_buff, AUDIO_FRAME_SIZE, 0, &stream_addr, sizeof(stream_addr));
+        res = mwifi_write(NULL, &data_type, i2s_out_buff, AUDIO_FRAME_SIZE, true);
 
-        if (res != AUDIO_FRAME_SIZE)
-        {
-            ESP_LOGE(TAG, "Voice call sent %d bytes instead of %d", res, AUDIO_FRAME_SIZE);
-        }
+        MDF_ERROR_CONTINUE(res != MDF_OK, "<%s> mwifi_write", mdf_err_to_name(res));
     }
     vTaskDelete(NULL);
 }
 
+
+
 void wavecom_recieve()
 {
-    int res = 0;
+    size_t res = 0;
+    mdf_err_t ret = MDF_OK;
+
+    mwifi_data_type_t data_type      = {0x0};
+    uint8_t src_addr[MWIFI_ADDR_LEN] = {0x0};
+
 
     if (i2s_in_buff == NULL)
     {
@@ -209,7 +218,9 @@ void wavecom_recieve()
 
     while (true)
     {
-        res = recvfrom(stream_fd, i2s_in_buff, 1024, 0, NULL, 0);
+        res = 1024;
+        ret = mwifi_read(src_addr, &data_type, i2s_in_buff, &res, portMAX_DELAY);
+        MDF_ERROR_CONTINUE(ret != MDF_OK, "<%s> mwifi_read", mdf_err_to_name(ret));
 
         if (res < 0)
         {
@@ -224,3 +235,4 @@ void wavecom_recieve()
     }
     vTaskDelete(NULL);
 }
+
