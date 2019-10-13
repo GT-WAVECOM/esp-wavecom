@@ -56,83 +56,18 @@ void wavecom_connect(void)
     stream_addr = *(struct sockaddr *)&servaddr;
     stream_fd = socket(AF_INET, SOCK_DGRAM, 0);
 
-    struct timeval receiving_timeout;
-    receiving_timeout.tv_sec = 2;
-    receiving_timeout.tv_usec = 0;
-    if (setsockopt(stream_fd, SOL_SOCKET, SO_RCVTIMEO, &receiving_timeout,
-                   sizeof(receiving_timeout)) < 0)
+    BaseType_t res = xTaskCreate(&wavecom_send,"call send task",4096,NULL,10,NULL);
+
+    if (res != pdPASS)
     {
-        ESP_LOGE(TAG, "FAILED TO SET SOCKET TIMEOUT");
-    }
-    else
-    {
-        ESP_LOGI(TAG, "SET SOCKET TIMEOUT!");
+        ESP_LOGE(TAG,"error %d when creating task wavecom_send",(int)res);
     }
 
-    sprintf(sndbuf, "%s 1", turn_pool);
+    res = xTaskCreate(&wavecom_recieve,"call recieve task",4096,NULL,10,NULL);
 
-    ESP_LOGI(TAG, "Sending: %s", sndbuf);
-
-    int attempt_count = 0;
-    bool handshake_success = false;
-
-    do
+    if (res != pdPASS)
     {
-        resp_len = sendto(stream_fd, sndbuf, strlen(sndbuf), 0, (struct sockaddr *)&servaddr, sizeof(servaddr));
-
-        ESP_LOGI(TAG, "Sent: %d bytes", resp_len);
-
-        resp_len = recvfrom(stream_fd, rcvbuf, 1024, 0, NULL, 0);
-
-        if (resp_len < 0)
-        {
-            ESP_LOGE(TAG, "RECIEVE ERROR");
-        }
-        else if (resp_len == 0)
-        {
-            ESP_LOGI(TAG, "BLANK RESPONSE");
-        }
-        else
-        {
-            if (resp_len >= 2)
-            {
-                ESP_LOGI(TAG,"RECIEVED %d bytes",resp_len);
-                handshake_success = true;
-                break;
-            }
-        }
-        vTaskDelay(300);
-    } while (++attempt_count <= 30);
-
-    if (handshake_success)
-    {
-        peer_ip = inet_ntoa(*(int *)rcvbuf);
-        peer_port = *(short *)(rcvbuf + 4);
-
-        ESP_LOGI(TAG, "Partner Information Recieved: %s %d", peer_ip, peer_port);
-
-        ESP_LOGI(TAG, "Connecting to Peer");
-
-        memset(&servaddr, 0, sizeof(servaddr));
-        servaddr.sin_family = AF_INET;
-        inet_pton(AF_INET, peer_ip, &servaddr.sin_addr); //EX: "123.456.789.123"
-        servaddr.sin_port = htons(peer_port);
-
-        stream_addr = *(struct sockaddr *)&servaddr;
-        
-        BaseType_t res = xTaskCreate(&wavecom_send,"call send task",4096,NULL,10,NULL);
-
-        if (res != pdPASS)
-        {
-            ESP_LOGE(TAG,"error %d when creating task wavecom_send",(int)res);
-        }
-
-        res = xTaskCreate(&wavecom_recieve,"call recieve task",4096,NULL,10,NULL);
-
-        if (res != pdPASS)
-        {
-            ESP_LOGE(TAG,"error %d when creating task wavecom_recieve",(int)res);
-        }
+        ESP_LOGE(TAG,"error %d when creating task wavecom_recieve",(int)res);
     }
 
     vTaskDelete(NULL);
