@@ -102,7 +102,7 @@ void tcp_client_read_task(void *arg)
 
         memset(data, 0, AUDIO_FRAME_SIZE);
         //ret = read(g_sockfd, data, size);
-        int res = recvfrom(stream_fd, data, 1024, 0, NULL, 0);
+        int res = recvfrom(stream_fd, data, AUDIO_FRAME_SIZE, 0, NULL, 0);
 
         //MDF_LOGD("TCP read, %d, size: %d, data: %s", g_sockfd, size, data);
 
@@ -176,14 +176,15 @@ void tcp_client_write_task(void *arg)
     MDF_LOGI("TCP client write task is running");
 
     while (mwifi_is_connected()) {
-        size = AUDIO_FRAME_SIZE ;
+        size = AUDIO_FRAME_SIZE;
         memset(data, 0, AUDIO_FRAME_SIZE);
         ret = mwifi_root_read(src_addr, &data_type, data, &size, portMAX_DELAY);
         MDF_ERROR_CONTINUE(ret != MDF_OK, "<%s> mwifi_root_read", mdf_err_to_name(ret));
 
         //MDF_LOGD("TCP write, size: %d, data: %s", size, data);
         //ret = write(g_sockfd, data, size);
-        res = sendto(stream_fd, data, AUDIO_FRAME_SIZE, 0, &stream_addr, sizeof(stream_addr));
+
+        res = sendto(stream_fd, data, size, 0, &stream_addr, sizeof(stream_addr));
         
         printf("forwarding %d bytes\n",res);
     }
@@ -289,10 +290,10 @@ static mdf_err_t event_loop_cb(mdf_event_loop_t event, void *ctx)
         case MDF_EVENT_MWIFI_ROOT_GOT_IP: {
             MDF_LOGI("Root obtains the IP address. It is posted by LwIP stack automatically");
             // root forward functions
-            xTaskCreate(tcp_client_write_task, "tcp_client_write_task", 4 * 1024,
+            xTaskCreate(tcp_client_write_task, "tcp_client_write_task", 6 * 1024,
                         NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL);
-            xTaskCreate(tcp_client_read_task, "tcp_server_read", 4 * 1024,
-                        NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL);
+            // xTaskCreate(tcp_client_read_task, "tcp_server_read", 4 * 1024,
+            //             NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL);
             break;
         }
 

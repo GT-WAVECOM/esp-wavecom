@@ -1,7 +1,8 @@
 #include "esp_system.h"
 
-#define RTP_HEADER_LEN 0
-#define AUDIO_FRAME_SIZE (512)
+#define RTP_HEADER_LEN 4
+#define SAMPLES_NUM (256)
+#define AUDIO_FRAME_SIZE (2*SAMPLES_NUM+RTP_HEADER_LEN)
 
 #define I2S_SAMPLE_RATE     48000
 #define I2S_CHANNEL         2
