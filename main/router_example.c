@@ -185,8 +185,10 @@ void tcp_client_write_task(void *arg)
         //ret = write(g_sockfd, data, size);
 
         res = sendto(stream_fd, data, size, 0, &stream_addr, sizeof(stream_addr));
+
         
-        printf("forwarding %d bytes\n",res);
+        int mac = *(int *) data;
+        printf("Recieved %s %d: Forwarding %d bytes for %x\n",mdf_err_to_name(ret),size,res,mac);
     }
 
     MDF_LOGI("TCP client write task is exit");
@@ -354,11 +356,11 @@ int _g711_encode(char *data, int len)
 {
     int out_len_bytes;
 
-    char *enc_buffer = (char *)audio_malloc(2 * AUDIO_FRAME_SIZE);
-    out_len_bytes = raw_stream_read(raw_read, enc_buffer, 2 * AUDIO_FRAME_SIZE);
+    char *enc_buffer = (char *)audio_malloc(AUDIO_FRAME_SIZE-RTP_HEADER_LEN);
+    out_len_bytes = raw_stream_read(raw_read, enc_buffer, AUDIO_FRAME_SIZE-RTP_HEADER_LEN);
     if (out_len_bytes > 0) {
         int16_t *enc_buffer_16 = (int16_t *)(enc_buffer);
-        for (int i = 0; i < AUDIO_FRAME_SIZE; i++) {
+        for (int i = RTP_HEADER_LEN; i < AUDIO_FRAME_SIZE; i++) {
 #ifdef CONFIG_SIP_CODEC_G711A
             data[i] = esp_g711a_encode(enc_buffer_16[i]);
 #else
