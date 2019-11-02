@@ -37,7 +37,7 @@ void wavecom_connect(void)
 {
     char *turn_pool = "abcdefgh";
     char *turn_ip = "10.3.141.1";
-    short turn_port = 7000; //6000 to 16000 incremented by 1k
+    short turn_port = 6666; //6000 to 16000 incremented by 1k
 
     ESP_LOGI(TAG, "Connection Request Initaited");
     ESP_LOGI(TAG, "IP: %s PORT: %d POOL: %s", turn_ip, turn_port, turn_pool);
@@ -59,12 +59,12 @@ void wavecom_connect(void)
         ESP_LOGE(TAG,"error %d when creating task wavecom_send",(int)res);
     }
 
-    // res = xTaskCreate(&wavecom_recieve,"call recieve task",4096,NULL,10,NULL);
+    res = xTaskCreate(&wavecom_recieve,"call recieve task",4096,NULL,10,NULL);
 
-    // if (res != pdPASS)
-    // {
-    //     ESP_LOGE(TAG,"error %d when creating task wavecom_recieve",(int)res);
-    // }
+    if (res != pdPASS)
+    {
+        ESP_LOGE(TAG,"error %d when creating task wavecom_recieve",(int)res);
+    }
 
     vTaskDelete(NULL);
 }

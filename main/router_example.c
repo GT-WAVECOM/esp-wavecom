@@ -145,9 +145,11 @@ void tcp_client_read_task(void *arg)
         // char *send_data = cJSON_PrintUnformatted(json_data);
         if(res>0)
         {
-            printf("recieved %d bytes\n",res);
+            memcpy(dest_addr,data,MWIFI_ADDR_LEN);
 
-            ret = mwifi_write(NULL, &data_type, data, res, true);
+            printf("forwarded %d bytes destined for %x\n",res, *(int *)dest_addr);
+
+            ret = mwifi_write(dest_addr, &data_type, data, res, true);
             MDF_ERROR_GOTO(ret != MDF_OK, FREE_MEM, "<%s> mwifi_root_write", mdf_err_to_name(ret));
         } 
     }
@@ -294,8 +296,8 @@ static mdf_err_t event_loop_cb(mdf_event_loop_t event, void *ctx)
             // root forward functions
             xTaskCreate(tcp_client_write_task, "tcp_client_write_task", 6 * 1024,
                         NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL);
-            // xTaskCreate(tcp_client_read_task, "tcp_server_read", 4 * 1024,
-            //             NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL);
+            xTaskCreate(tcp_client_read_task, "tcp_server_read", 4 * 1024,
+                        NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL);
             break;
         }
 

@@ -1,5 +1,8 @@
 {
     "files.associations": {
-        "tcpip_adapter.h": "c"
+        "tcpip_adapter.h": "c",
+        "array": "c",
+        "string": "c",
+        "string_view": "c"
     }
 }
