@@ -4,7 +4,7 @@
 #define SAMPLES_NUM (256)
 #define AUDIO_FRAME_SIZE (2*SAMPLES_NUM+RTP_HEADER_LEN)
 
-#define I2S_SAMPLE_RATE     48000
+#define I2S_SAMPLE_RATE     16000
 #define I2S_CHANNEL         2
 #define I2S_BITS            16
 
