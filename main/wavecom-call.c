@@ -117,8 +117,8 @@ void wavecom_send()
         else
         {
             speaker_muted = false;
-            //ESP_LOGI(TAG,"microphone muted");
-            memset(i2s_out_buff, 0, AUDIO_FRAME_SIZE);
+            // ESP_LOGI(TAG,"microphone muted");
+            memset(i2s_out_buff + MWIFI_ADDR_LEN, 0, AUDIO_FRAME_SIZE - MWIFI_ADDR_LEN);
         }
         if(res == 0)
         {
