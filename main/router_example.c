@@ -145,9 +145,11 @@ void tcp_client_read_task(void *arg)
         // char *send_data = cJSON_PrintUnformatted(json_data);
         if(res>0)
         {
-            printf("recieved %d bytes\n",res);
+            memcpy(dest_addr,data,MWIFI_ADDR_LEN);
 
-            ret = mwifi_write(NULL, &data_type, data, res, true);
+            printf("forwarded %d bytes destined for %x\n",res, *(int *)dest_addr);
+
+            ret = mwifi_write(dest_addr, &data_type, data, res, true);
             MDF_ERROR_GOTO(ret != MDF_OK, FREE_MEM, "<%s> mwifi_root_write", mdf_err_to_name(ret));
         } 
     }
@@ -185,8 +187,10 @@ void tcp_client_write_task(void *arg)
         //ret = write(g_sockfd, data, size);
 
         res = sendto(stream_fd, data, size, 0, &stream_addr, sizeof(stream_addr));
+
         
-        printf("forwarding %d bytes\n",res);
+        int mac = *(int *) data;
+        printf("Recieved %s %d: Forwarding %d bytes for %x\n",mdf_err_to_name(ret),size,res,mac);
     }
 
     MDF_LOGI("TCP client write task is exit");
@@ -292,8 +296,8 @@ static mdf_err_t event_loop_cb(mdf_event_loop_t event, void *ctx)
             // root forward functions
             xTaskCreate(tcp_client_write_task, "tcp_client_write_task", 6 * 1024,
                         NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL);
-            // xTaskCreate(tcp_client_read_task, "tcp_server_read", 4 * 1024,
-            //             NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL);
+            xTaskCreate(tcp_client_read_task, "tcp_server_read", 4 * 1024,
+                        NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL);
             break;
         }
 
@@ -354,11 +358,11 @@ int _g711_encode(char *data, int len)
 {
     int out_len_bytes;
 
-    char *enc_buffer = (char *)audio_malloc(2 * AUDIO_FRAME_SIZE);
-    out_len_bytes = raw_stream_read(raw_read, enc_buffer, 2 * AUDIO_FRAME_SIZE);
+    char *enc_buffer = (char *)audio_malloc(AUDIO_FRAME_SIZE-RTP_HEADER_LEN);
+    out_len_bytes = raw_stream_read(raw_read, enc_buffer, AUDIO_FRAME_SIZE-RTP_HEADER_LEN);
     if (out_len_bytes > 0) {
         int16_t *enc_buffer_16 = (int16_t *)(enc_buffer);
-        for (int i = 0; i < AUDIO_FRAME_SIZE; i++) {
+        for (int i = RTP_HEADER_LEN; i < AUDIO_FRAME_SIZE; i++) {
 #ifdef CONFIG_SIP_CODEC_G711A
             data[i] = esp_g711a_encode(enc_buffer_16[i]);
 #else
