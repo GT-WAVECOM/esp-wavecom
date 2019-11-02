@@ -59,12 +59,12 @@ void wavecom_connect(void)
         ESP_LOGE(TAG,"error %d when creating task wavecom_send",(int)res);
     }
 
-    res = xTaskCreate(&wavecom_recieve,"call recieve task",4096,NULL,10,NULL);
+    // res = xTaskCreate(&wavecom_recieve,"call recieve task",4096,NULL,10,NULL);
 
-    if (res != pdPASS)
-    {
-        ESP_LOGE(TAG,"error %d when creating task wavecom_recieve",(int)res);
-    }
+    // if (res != pdPASS)
+    // {
+    //     ESP_LOGE(TAG,"error %d when creating task wavecom_recieve",(int)res);
+    // }
 
     vTaskDelete(NULL);
 }
@@ -118,14 +118,14 @@ void wavecom_send()
         {
             speaker_muted = false;
             // ESP_LOGI(TAG,"microphone muted");
-            memset(i2s_out_buff + MWIFI_ADDR_LEN, 0, AUDIO_FRAME_SIZE - MWIFI_ADDR_LEN);
+            // memset(i2s_out_buff + MWIFI_ADDR_LEN, 0, AUDIO_FRAME_SIZE - MWIFI_ADDR_LEN);
         }
         if(res == 0)
         {
             ESP_LOGI(TAG,"_g711_encode returned 0");
             continue;
         }
-        res = mwifi_write(NULL, &data_type, i2s_out_buff, AUDIO_FRAME_SIZE, true);
+        res = mwifi_write(NULL, &data_type, i2s_out_buff, PACKET_SIZE, true);
 
         MDF_ERROR_CONTINUE(res != MDF_OK, "<%s> mwifi_write", mdf_err_to_name(res));
     }
@@ -159,7 +159,7 @@ void wavecom_recieve()
 
     while (true)
     {
-        res = AUDIO_FRAME_SIZE;
+        res = PACKET_SIZE;
         ret = mwifi_read(src_addr, &data_type, i2s_in_buff, &res, portMAX_DELAY);
         MDF_ERROR_CONTINUE(ret != MDF_OK, "<%s> mwifi_read", mdf_err_to_name(ret));
 

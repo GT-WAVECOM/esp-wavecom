@@ -86,8 +86,8 @@ ERR_EXIT:
 void tcp_client_read_task(void *arg)
 {
     mdf_err_t ret                     = MDF_OK;
-    char *data                        = MDF_MALLOC(AUDIO_FRAME_SIZE);
-    size_t size                       = AUDIO_FRAME_SIZE;
+    char *data                        = MDF_MALLOC(PACKET_SIZE);
+    size_t size                       = PACKET_SIZE;
     uint8_t dest_addr[MWIFI_ADDR_LEN] = {0x0};
     mwifi_data_type_t data_type       = {0x0};
     cJSON *json_root                  = NULL;
@@ -100,9 +100,9 @@ void tcp_client_read_task(void *arg)
 
     while (mwifi_is_connected()) {
 
-        memset(data, 0, AUDIO_FRAME_SIZE);
+        memset(data, 0, PACKET_SIZE);
         //ret = read(g_sockfd, data, size);
-        int res = recvfrom(stream_fd, data, AUDIO_FRAME_SIZE, 0, NULL, 0);
+        int res = recvfrom(stream_fd, data, PACKET_SIZE, 0, NULL, 0);
 
         //MDF_LOGD("TCP read, %d, size: %d, data: %s", g_sockfd, size, data);
 
@@ -170,16 +170,16 @@ void tcp_client_write_task(void *arg)
 {
     int res = 0;
     mdf_err_t ret = MDF_OK;
-    char *data    = MDF_CALLOC(1, AUDIO_FRAME_SIZE);
-    size_t size   = AUDIO_FRAME_SIZE;
+    char *data    = MDF_CALLOC(1, PACKET_SIZE);
+    size_t size   = PACKET_SIZE;
     uint8_t src_addr[MWIFI_ADDR_LEN] = {0x0};
     mwifi_data_type_t data_type      = {0x0};
 
     MDF_LOGI("TCP client write task is running");
 
     while (mwifi_is_connected()) {
-        size = AUDIO_FRAME_SIZE;
-        memset(data, 0, AUDIO_FRAME_SIZE);
+        size = PACKET_SIZE;
+        memset(data, 0, PACKET_SIZE);
         ret = mwifi_root_read(src_addr, &data_type, data, &size, portMAX_DELAY);
         MDF_ERROR_CONTINUE(ret != MDF_OK, "<%s> mwifi_root_read", mdf_err_to_name(ret));
 
@@ -189,8 +189,8 @@ void tcp_client_write_task(void *arg)
         res = sendto(stream_fd, data, size, 0, &stream_addr, sizeof(stream_addr));
 
         
-        int mac = *(int *) data;
-        printf("Recieved %s %d: Forwarding %d bytes for %x\n",mdf_err_to_name(ret),size,res,mac);
+        // int mac = *(int *) data;
+        // printf("Recieved %s %d: Forwarding %d bytes for %x\n",mdf_err_to_name(ret),size,res,mac);
     }
 
     MDF_LOGI("TCP client write task is exit");
@@ -296,8 +296,8 @@ static mdf_err_t event_loop_cb(mdf_event_loop_t event, void *ctx)
             // root forward functions
             xTaskCreate(tcp_client_write_task, "tcp_client_write_task", 6 * 1024,
                         NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL);
-            xTaskCreate(tcp_client_read_task, "tcp_server_read", 4 * 1024,
-                        NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL);
+            // xTaskCreate(tcp_client_read_task, "tcp_server_read", 4 * 1024,
+            //             NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL);
             break;
         }
 
