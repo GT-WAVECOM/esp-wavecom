@@ -510,14 +510,14 @@ void app_main()
     audio_board_key_init(set);
 
     ESP_LOGI(TAG, "[ 2 ] Start codec chip");
-    audio_board_handle_t board_handle = audio_board_init();
-    audio_hal_ctrl_codec(board_handle->audio_hal, AUDIO_HAL_CODEC_MODE_BOTH, AUDIO_HAL_CTRL_START);
+    // audio_board_handle_t board_handle = audio_board_init();
+    // audio_hal_ctrl_codec(board_handle->audio_hal, AUDIO_HAL_CODEC_MODE_BOTH, AUDIO_HAL_CTRL_START);
 
     ESP_LOGI(TAG, "[ 3 ] Create and start input key service");
     input_key_service_info_t input_key_info[] = INPUT_KEY_DEFAULT_INFO();
     periph_service_handle_t input_ser = input_key_service_create(set);
     input_key_service_add_key(input_ser, input_key_info, INPUT_KEY_NUM);
-    periph_service_set_callback(input_ser, input_key_service_cb, (void *)board_handle);
+    // periph_service_set_callback(input_ser, input_key_service_cb, (void *)board_handle);
 
     mwifi_init_config_t cfg   = MWIFI_INIT_CONFIG_DEFAULT();
     mwifi_config_t config     = {
@@ -566,4 +566,10 @@ void app_main()
 
     g711enc_pipeline_open();
     g711dec_pipeline_open();
+
+    while (!mwifi_is_connected()) {
+        vTaskDelay(500 / portTICK_RATE_MS);
+        continue;
+    }
+    BaseType_t res = xTaskCreate(&wavecom_connect,"call connection task",4096,NULL,10,NULL);
 }
